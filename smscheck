@@ -1,0 +1,32 @@
+#!/bin/sh
+
+# SME file destination
+SMSFILE=${SMSFILE:-~/.local/share/sms}
+
+# modem number
+MODEMNO=$(mmcli -L | sed 's#.*Modem/\([0-9]\+\).*#\1#')
+
+# sms number
+SMSNO=$(mmcli -m $MODEMNO --messaging-list-sms | awk '/received/{split($1, ar, /\//); print ar[6]; exit}')
+
+# get sms
+LASTSMS=$(mmcli -m $MODEMNO -s /org/freedesktop/ModemManager1/SMS/${SMSNO}) # >> ~/share/documents/sms
+
+# last timestamp
+TIMESTAMPLINE=$(echo -n "$LASTSMS" | grep "timestamp")
+
+# is last sms a new one ?
+ISNEW=$(expr $(grep -c "$TIMESTAMPLINE"  $SMSFILE) = 0)
+
+if [ $ISNEW -eq 1 ]
+then
+    # SMS text
+    SMSBODY=$(echo -n "$LASTSMS" | grep "text:" | sed "s#[ |]\+text: ##")
+
+    # notify sms
+    notify-send -u critical SMS "$SMSBODY"
+
+    # write sms
+    echo "$LASTSMS" >> $SMSFILE
+fi
+exit 0
